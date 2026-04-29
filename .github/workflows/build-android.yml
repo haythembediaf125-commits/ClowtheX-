@@ -20,12 +20,17 @@ jobs:
         with:
           node-version: "20"
       - run: npm install --legacy-peer-deps
+      - run: npm install --no-save @capacitor/assets@^3.0.5
       - run: npm run build
         env:
           BASE_PATH: "./"
       - run: |
           if [ ! -d android ]; then npx cap add android; fi
           npx cap sync android
+      - name: Generate app icons
+        run: npx @capacitor/assets generate --android --iconBackgroundColor '#0f172a' --iconBackgroundColorDark '#0f172a' --splashBackgroundColor '#0f172a' --splashBackgroundColorDark '#0f172a'
+      - name: Sync after assets
+        run: npx cap sync android
       - working-directory: android
         run: |
           chmod +x ./gradlew
