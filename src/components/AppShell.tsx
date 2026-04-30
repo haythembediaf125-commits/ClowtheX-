@@ -48,20 +48,18 @@ export function AppShell() {
       </header>
 
       <main className="flex-1 max-w-3xl mx-auto w-full pb-24">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={tab}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-          >
-            {tab === "inventory" && <InventoryPage />}
-            {tab === "pos" && <POSPage />}
-            {tab === "reports" && <ReportsPage />}
-            {tab === "settings" && <SettingsPage />}
-          </motion.div>
-        </AnimatePresence>
+        <div style={{ display: tab === "inventory" ? "block" : "none" }}>
+          <InventoryPage />
+        </div>
+        <div style={{ display: tab === "pos" ? "block" : "none" }}>
+          <POSPage />
+        </div>
+        <div style={{ display: tab === "reports" ? "block" : "none" }}>
+          <ReportsPage />
+        </div>
+        <div style={{ display: tab === "settings" ? "block" : "none" }}>
+          <SettingsPage />
+        </div>
       </main>
 
       <nav className="fixed bottom-0 inset-x-0 z-30 border-t border-border bg-card/95 backdrop-blur">
