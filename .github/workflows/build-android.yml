@@ -27,8 +27,30 @@ jobs:
       - run: |
           if [ ! -d android ]; then npx cap add android; fi
           npx cap sync android
+      - name: Prepare icon
+        run: |
+          mkdir -p resources
+          if [ -f icon.png ]; then cp icon.png resources/icon.png; fi
       - name: Generate app icons
         run: npx @capacitor/assets generate --android --iconBackgroundColor '#0f172a' --iconBackgroundColorDark '#0f172a' --splashBackgroundColor '#0f172a' --splashBackgroundColorDark '#0f172a'
+      - name: Add Camera permissions to AndroidManifest
+        run: |
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          if ! grep -q "android.permission.CAMERA" "$MANIFEST"; then
+            sed -i 's|<uses-permission android:name="android.permission.INTERNET" />|<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-feature android:name="android.hardware.camera" android:required="false" />|' "$MANIFEST"
+          fi
+          echo "==== AndroidManifest.xml ===="
+          cat "$MANIFEST"
+      - name: Replace MainActivity.java with camera-enabled version
+        run: |
+          if [ -f MainActivity.java ]; then
+            TARGET=$(find android/app/src/main/java -name 'MainActivity.java' | head -n 1)
+            echo "Replacing $TARGET"
+            cp MainActivity.java "$TARGET"
+            cat "$TARGET"
+          else
+            echo "MainActivity.java not found in repo root, skipping"
+          fi
       - name: Sync after assets
         run: npx cap sync android
       - working-directory: android
