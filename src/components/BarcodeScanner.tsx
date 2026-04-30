@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Html5Qrcode } from "html5-qrcode";
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/contexts/AppContext";
@@ -24,16 +24,42 @@ export function BarcodeScanner({ open, onOpenChange, onDetected }: Props) {
 
     const start = async () => {
       try {
-        // Wait for DOM element
-        await new Promise((r) => setTimeout(r, 50));
+        await new Promise((r) => setTimeout(r, 30));
         if (cancelled) return;
         const el = document.getElementById(containerId);
         if (!el) return;
-        const scanner = new Html5Qrcode(containerId, { verbose: false });
+        const scanner = new Html5Qrcode(containerId, {
+          verbose: false,
+          formatsToSupport: [
+            Html5QrcodeSupportedFormats.QR_CODE,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+          ],
+          useBarCodeDetectorIfSupported: true,
+        });
         scannerRef.current = scanner;
         await scanner.start(
           { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 250, height: 150 } },
+          {
+            fps: 30,
+            qrbox: (vw, vh) => {
+              const minEdge = Math.min(vw, vh);
+              const size = Math.floor(minEdge * 0.75);
+              return { width: size, height: Math.floor(size * 0.7) };
+            },
+            aspectRatio: 1.7777,
+            disableFlip: false,
+            videoConstraints: {
+              facingMode: "environment",
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+              frameRate: { ideal: 30, max: 60 },
+            },
+          },
           (decoded) => {
             onDetected(decoded);
             stop();
