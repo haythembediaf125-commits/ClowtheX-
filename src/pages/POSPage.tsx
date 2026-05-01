@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
@@ -49,6 +49,7 @@ export function POSPage() {
   const { t, formatPrice, currency, exchangeRate } = useApp();
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
   const [scanOpen, setScanOpen] = useState(false);
   const [cart, setCart] = useState<SaleItem[]>([]);
   const [discount, setDiscount] = useState(0);
@@ -103,6 +104,7 @@ export function POSPage() {
       ];
     });
     setSearch("");
+    setTimeout(() => searchRef.current?.focus(), 50);
   };
 
   const handleScanned = async (code: string) => {
@@ -202,20 +204,33 @@ export function POSPage() {
 
   return (
     <div className="px-4 py-5 space-y-4">
-      <h2 className="text-xl font-bold flex items-center gap-2">
-        <ShoppingCart className="w-5 h-5 text-gold" />
-        {t.pos.title}
-      </h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold flex items-center gap-2">
+          <ShoppingCart className="w-5 h-5 text-gold" />
+          {t.pos.title}
+        </h2>
+        {cart.length > 0 && (
+          <Button variant="gold" size="sm" onClick={checkout} className="gap-1.5 font-bold shadow-gold">
+            <Receipt className="w-4 h-4" />
+            {t.pos.pay}
+            <Badge variant="secondary" className="ms-1 bg-black/20 text-white text-xs">
+              {formatPrice(total)}
+            </Badge>
+          </Button>
+        )}
+      </div>
 
       {/* Search + Scan */}
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Search className="absolute top-1/2 -translate-y-1/2 start-3 w-4 h-4 text-muted-foreground" />
           <Input
+            ref={searchRef}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t.pos.search}
             className="ps-10"
+            autoComplete="off"
           />
           {filtered.length > 0 && (
             <div className="absolute z-20 mt-1 w-full rounded-lg border bg-popover shadow-lg overflow-hidden">
@@ -223,6 +238,7 @@ export function POSPage() {
                 <button
                   key={p.id}
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => addToCart(p)}
                   className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-accent/20 text-start"
                 >
