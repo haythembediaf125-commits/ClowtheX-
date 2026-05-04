@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Languages, Coins, Palette, Store, Save } from "lucide-react";
+import { Languages, Coins, Palette, Store, Save, Download, Upload, Archive } from "lucide-react"; Store, Save } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -60,7 +60,7 @@ export function SettingsPage() {
     <div className="px-4 py-5 space-y-5">
       <h2 className="text-xl font-bold">{t.settings.title}</h2>
 
-      <Section icon={<Languages className="w-4 h-4" />}>
+      <Section icon={<Archive className="w-4 h-4" />}
         <div>
           <Label className="text-xs">{t.settings.language}</Label>
           <Select value={lang} onValueChange={(v) => setLang(v as Lang)}>
