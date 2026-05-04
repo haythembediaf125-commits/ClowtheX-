@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Languages, Coins, Palette, Store, Save, Download, Upload, Archive } from "lucide-react"; Store, Save } from "lucide-react";
+import { Coins, Palette, Store, Save, Archive } from "lucide-react";
+
 import {
   Select,
   SelectContent,
@@ -28,6 +29,7 @@ export function SettingsPage() {
     exchangeRate,
     setExchangeRate,
   } = useApp();
+
   const [storeName, setStoreName] = useState("");
   const [storePhone, setStorePhone] = useState("");
   const [storeAddress, setStoreAddress] = useState("");
@@ -40,10 +42,7 @@ export function SettingsPage() {
     })();
   }, []);
 
-  const saveStore = async (
-    key: "storeName" | "storePhone" | "storeAddress",
-    value: string,
-  ) => {
+  const saveStore = async (key: string, value: string) => {
     await setSetting(key, value);
   };
 
@@ -60,7 +59,7 @@ export function SettingsPage() {
     <div className="px-4 py-5 space-y-5">
       <h2 className="text-xl font-bold">{t.settings.title}</h2>
 
-      <Section icon={<Archive className="w-4 h-4" />}
+      <Section icon={<Archive className="w-4 h-4" />} title="Settings">
         <div>
           <Label className="text-xs">{t.settings.language}</Label>
           <Select value={lang} onValueChange={(v) => setLang(v as Lang)}>
@@ -92,13 +91,11 @@ export function SettingsPage() {
             </SelectContent>
           </Select>
         </div>
+
         <div>
           <Label className="text-xs">{t.settings.exchangeRate}</Label>
           <Input
             type="number"
-            inputMode="decimal"
-            min="0"
-            step="0.01"
             value={exchangeRate}
             onChange={(e) =>
               setExchangeRate(Math.max(0, Number(e.target.value) || 0))
@@ -109,56 +106,49 @@ export function SettingsPage() {
       </Section>
 
       <Section icon={<Palette className="w-4 h-4" />}>
-        <div>
-          <Label className="text-xs">{t.settings.theme}</Label>
-          <div className="grid grid-cols-2 gap-2 mt-1">
-            <Button
-              variant={theme === "light" ? "gold" : "outline"}
-              onClick={() => setTheme("light")}
-              size="sm"
-            >
-              {t.settings.themeLight}
-            </Button>
-            <Button
-              variant={theme === "dark" ? "gold" : "outline"}
-              onClick={() => setTheme("dark")}
-              size="sm"
-            >
-              {t.settings.themeDark}
-            </Button>
-          </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            variant={theme === "light" ? "gold" : "outline"}
+            onClick={() => setTheme("light")}
+          >
+            Light
+          </Button>
+
+          <Button
+            variant={theme === "dark" ? "gold" : "outline"}
+            onClick={() => setTheme("dark")}
+          >
+            Dark
+          </Button>
         </div>
       </Section>
 
-      <Section icon={<Store className="w-4 h-4" />} title={t.settings.store}>
+      <Section icon={<Store className="w-4 h-4" />} title="Store">
         <div>
           <Label className="text-xs">{t.settings.storeName}</Label>
           <Input
             value={storeName}
             onChange={(e) => setStoreName(e.target.value)}
-            onBlur={() => saveStore("storeName", storeName)}
-            className="mt-1"
           />
         </div>
+
         <div>
           <Label className="text-xs">{t.settings.storePhone}</Label>
           <Input
             value={storePhone}
             onChange={(e) => setStorePhone(e.target.value)}
-            onBlur={() => saveStore("storePhone", storePhone)}
-            className="mt-1"
           />
         </div>
+
         <div>
           <Label className="text-xs">{t.settings.storeAddress}</Label>
           <Input
             value={storeAddress}
             onChange={(e) => setStoreAddress(e.target.value)}
-            onBlur={() => saveStore("storeAddress", storeAddress)}
-            className="mt-1"
           />
         </div>
-        <Button variant="gold" className="w-full" onClick={handleSaveStore}>
+
+        <Button className="w-full mt-2" onClick={handleSaveStore}>
           <Save className="w-4 h-4" />
           {t.form.save}
         </Button>
@@ -177,11 +167,9 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border bg-card p-4 shadow-elegant space-y-3">
+    <div className="rounded-xl border bg-card p-4 space-y-3">
       <div className="flex items-center gap-2 text-gold">
-        <span className="w-7 h-7 rounded-md bg-gold/15 grid place-items-center">
-          {icon}
-        </span>
+        {icon}
         {title && <span className="text-sm font-semibold">{title}</span>}
       </div>
       {children}
