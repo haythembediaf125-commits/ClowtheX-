@@ -1,473 +1,301 @@
-export type Lang = "ar" | "fr" | "en";
+import { useEffect, useRef, useState } from "react";
+import { Languages, Coins, Palette, Store, Save, Download, Upload, DatabaseBackup } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { useApp } from "@/contexts/AppContext";
+import { getDB, getSetting, setSetting } from "@/lib/db";
+import { toast } from "sonner";
+import type { Lang } from "@/i18n/translations";
+import type { Currency } from "@/lib/db";
 
-export const translations = {
-  ar: {
-    appName: "Style Stock Manager",
-    appTagline: "إدارة محل الملابس الرجالية",
-    activation: {
-      title: "تفعيل التطبيق",
-      subtitle: "أدخل كود التفعيل للمتابعة",
-      placeholder: "كود التفعيل",
-      button: "تفعيل",
-      invalid: "كود التفعيل غير صحيح",
-      success: "تم التفعيل بنجاح",
-      scanQr: "تفعيل بمسح QR",
-      scanHint: "وجّه الكاميرا نحو رمز QR للتفعيل",
-      or: "أو",
-      step1: "الخطوة 1: مسح رمز QR",
-      step2: "الخطوة 2: إدخال كلمة السر",
-      startScan: "بدء المسح",
-      qrVerified: "تم التحقق من رمز QR",
-      qrInvalid: "رمز QR غير صالح",
-      passwordPlaceholder: "كلمة السر",
-      back: "رجوع",
-    },
-    nav: {
-      inventory: "المخزون",
-      pos: "البيع",
-      reports: "التقارير",
-      settings: "الإعدادات",
-    },
-    inventory: {
-      title: "المخزون",
-      addProduct: "إضافة منتج",
-      editProduct: "تعديل منتج",
-      search: "ابحث عن منتج...",
-      allCategories: "كل التصنيفات",
-      sortBy: "الترتيب",
-      sortName: "الاسم",
-      sortPrice: "السعر",
-      sortQty: "الكمية",
-      asc: "تصاعدي",
-      desc: "تنازلي",
-      empty: "لا توجد منتجات بعد",
-      emptyHint: "ابدأ بإضافة أول منتج إلى مخزونك",
-      noResults: "لا نتائج مطابقة",
-      lowStock: "كمية منخفضة",
-      outOfStock: "نفد من المخزون",
-      stats: {
-        products: "المنتجات",
-        units: "الوحدات",
-        value: "قيمة المخزون",
-        lowStock: "تحتاج إعادة طلب",
-      },
-    },
-    form: {
-      name: "اسم المنتج",
-      category: "التصنيف",
-      size: "المقاس",
-      color: "اللون",
-      purchasePrice: "سعر الشراء",
-      salePrice: "سعر البيع",
-      quantity: "الكمية",
-      lowStockThreshold: "حد التنبيه",
-      image: "صورة المنتج",
-      barcode: "الباركود",
-      generate: "توليد",
-      scan: "مسح",
-      printBarcode: "طباعة الباركود",
-      save: "حفظ",
-      cancel: "إلغاء",
-      delete: "حذف",
-      confirmDelete: "هل أنت متأكد من حذف هذا المنتج؟",
-      required: "هذا الحقل مطلوب",
-      saved: "تم الحفظ بنجاح",
-      deleted: "تم الحذف",
-      pickImage: "اختر صورة",
-      changeImage: "تغيير الصورة",
-    },
-    categories: {
-      shirts: "قمصان",
-      pants: "بناطيل",
-      shoes: "أحذية",
-      jackets: "جاكيتات",
-      accessories: "إكسسوارات",
-      other: "أخرى",
-    },
-    pos: {
-      title: "نقطة البيع",
-      cart: "السلة",
-      emptyCart: "السلة فارغة",
-      emptyHint: "ابحث أو امسح الباركود لإضافة منتج",
-      scan: "مسح باركود",
-      addByCode: "إدخال الكود يدوياً",
-      search: "ابحث عن منتج أو امسح...",
-      subtotal: "المجموع الفرعي",
-      discount: "الخصم",
-      total: "الإجمالي",
-      pay: "إتمام الدفع",
-      customerName: "اسم العميل (اختياري)",
-      paymentMethod: "طريقة الدفع",
-      cash: "نقدي",
-      card: "بطاقة",
-      other: "أخرى",
-      stockWarning: "الكمية المتاحة محدودة",
-      notFound: "المنتج غير موجود",
-      saleSuccess: "تمت عملية البيع",
-      printInvoice: "طباعة الفاتورة",
-      invoice: "فاتورة",
-      invoiceNo: "رقم الفاتورة",
-      date: "التاريخ",
-      item: "المنتج",
-      qty: "الكمية",
-      price: "السعر",
-      lineTotal: "المجموع",
-      thanks: "شكراً لتسوقكم معنا",
-    },
-    reports: {
-      title: "التقارير",
-      period: "الفترة",
-      today: "اليوم",
-      week: "الأسبوع",
-      month: "الشهر",
-      year: "السنة",
-      revenue: "الإيرادات",
-      profit: "الأرباح",
-      salesCount: "عدد المبيعات",
-      avgSale: "متوسط البيع",
-      chartSales: "المبيعات اليومية",
-      topProducts: "أكثر المنتجات مبيعاً",
-      recentSales: "المبيعات الأخيرة",
-      noSales: "لا توجد مبيعات في هذه الفترة",
-      viewInvoice: "عرض",
-      units: "وحدة",
-    },
-    settings: {
-      title: "الإعدادات",
-      language: "اللغة",
-      currency: "العملة الافتراضية",
-      exchangeRate: "سعر صرف الأورو (1 EUR = ? DZD)",
-      theme: "المظهر",
-      themeLight: "فاتح",
-      themeDark: "داكن",
-      store: "بيانات المحل",
-      storeName: "اسم المحل",
-      storePhone: "الهاتف",
-      storeAddress: "العنوان",
-      backup: "النسخ الاحتياطي",
-      export: "تصدير البيانات",
-      import: "استيراد البيانات",
-      saved: "تم الحفظ",
-      imported: "تم الاستيراد",
-      importError: "ملف غير صالح",
-    },
-    scanner: {
-      title: "مسح الباركود",
-      hint: "وجّه الكاميرا نحو الباركود",
-      cancel: "إلغاء",
-      permissionDenied: "تم رفض إذن الكاميرا",
-    },
-  },
-  fr: {
-    appName: "Style Stock Manager",
-    appTagline: "Gestion de boutique de vêtements pour hommes",
-    activation: {
-      title: "Activation",
-      subtitle: "Entrez le code d'activation pour continuer",
-      placeholder: "Code d'activation",
-      button: "Activer",
-      invalid: "Code d'activation invalide",
-      success: "Activation réussie",
-      scanQr: "Activer par QR",
-      scanHint: "Pointez la caméra vers le QR d'activation",
-      or: "ou",
-      step1: "Étape 1 : Scannez le QR",
-      step2: "Étape 2 : Entrez le mot de passe",
-      startScan: "Démarrer le scan",
-      qrVerified: "QR vérifié",
-      qrInvalid: "QR invalide",
-      passwordPlaceholder: "Mot de passe",
-      back: "Retour",
-    },
-    nav: { inventory: "Stock", pos: "Vente", reports: "Rapports", settings: "Paramètres" },
-    inventory: {
-      title: "Stock",
-      addProduct: "Ajouter un produit",
-      editProduct: "Modifier",
-      search: "Rechercher un produit...",
-      allCategories: "Toutes les catégories",
-      sortBy: "Trier",
-      sortName: "Nom",
-      sortPrice: "Prix",
-      sortQty: "Quantité",
-      asc: "Croissant",
-      desc: "Décroissant",
-      empty: "Aucun produit",
-      emptyHint: "Ajoutez votre premier produit",
-      noResults: "Aucun résultat",
-      lowStock: "Stock faible",
-      outOfStock: "Rupture de stock",
-      stats: {
-        products: "Produits",
-        units: "Unités",
-        value: "Valeur du stock",
-        lowStock: "À réapprovisionner",
-      },
-    },
-    form: {
-      name: "Nom du produit",
-      category: "Catégorie",
-      size: "Taille",
-      color: "Couleur",
-      purchasePrice: "Prix d'achat",
-      salePrice: "Prix de vente",
-      quantity: "Quantité",
-      lowStockThreshold: "Seuil d'alerte",
-      image: "Image",
-      barcode: "Code-barres",
-      generate: "Générer",
-      scan: "Scanner",
-      printBarcode: "Imprimer le code",
-      save: "Enregistrer",
-      cancel: "Annuler",
-      delete: "Supprimer",
-      confirmDelete: "Supprimer ce produit ?",
-      required: "Champ requis",
-      saved: "Enregistré",
-      deleted: "Supprimé",
-      pickImage: "Choisir une image",
-      changeImage: "Changer l'image",
-    },
-    categories: {
-      shirts: "Chemises",
-      pants: "Pantalons",
-      shoes: "Chaussures",
-      jackets: "Vestes",
-      accessories: "Accessoires",
-      other: "Autres",
-    },
-    pos: {
-      title: "Point de vente",
-      cart: "Panier",
-      emptyCart: "Panier vide",
-      emptyHint: "Recherchez ou scannez un code",
-      scan: "Scanner",
-      addByCode: "Saisir le code",
-      search: "Rechercher ou scanner...",
-      subtotal: "Sous-total",
-      discount: "Remise",
-      total: "Total",
-      pay: "Encaisser",
-      customerName: "Client (optionnel)",
-      paymentMethod: "Paiement",
-      cash: "Espèces",
-      card: "Carte",
-      other: "Autre",
-      stockWarning: "Stock limité",
-      notFound: "Produit introuvable",
-      saleSuccess: "Vente enregistrée",
-      printInvoice: "Imprimer la facture",
-      invoice: "Facture",
-      invoiceNo: "N° Facture",
-      date: "Date",
-      item: "Produit",
-      qty: "Qté",
-      price: "Prix",
-      lineTotal: "Total",
-      thanks: "Merci de votre visite",
-    },
-    reports: {
-      title: "Rapports",
-      period: "Période",
-      today: "Aujourd'hui",
-      week: "Semaine",
-      month: "Mois",
-      year: "Année",
-      revenue: "Chiffre d'affaires",
-      profit: "Bénéfice",
-      salesCount: "Nombre de ventes",
-      avgSale: "Panier moyen",
-      chartSales: "Ventes quotidiennes",
-      topProducts: "Meilleures ventes",
-      recentSales: "Ventes récentes",
-      noSales: "Aucune vente sur cette période",
-      viewInvoice: "Voir",
-      units: "unité(s)",
-    },
-    settings: {
-      title: "Paramètres",
-      language: "Langue",
-      currency: "Devise par défaut",
-      exchangeRate: "Taux EUR (1 EUR = ? DZD)",
-      theme: "Thème",
-      themeLight: "Clair",
-      themeDark: "Sombre",
-      store: "Informations du magasin",
-      storeName: "Nom du magasin",
-      storePhone: "Téléphone",
-      storeAddress: "Adresse",
-      backup: "Sauvegarde",
-      export: "Exporter",
-      import: "Importer",
-      saved: "Enregistré",
-      imported: "Importé",
-      importError: "Fichier invalide",
-    },
-    scanner: {
-      title: "Scanner un code",
-      hint: "Pointez la caméra vers le code",
-      cancel: "Annuler",
-      permissionDenied: "Permission caméra refusée",
-    },
-  },
-  en: {
-    appName: "Style Stock Manager",
-    appTagline: "Men's clothing store management",
-    activation: {
-      title: "Activation",
-      subtitle: "Enter the activation code to continue",
-      placeholder: "Activation code",
-      button: "Activate",
-      invalid: "Invalid activation code",
-      success: "Activated successfully",
-      scanQr: "Activate with QR",
-      scanHint: "Point the camera at the activation QR code",
-      or: "or",
-      step1: "Step 1: Scan QR code",
-      step2: "Step 2: Enter password",
-      startScan: "Start scan",
-      qrVerified: "QR verified",
-      qrInvalid: "Invalid QR",
-      passwordPlaceholder: "Password",
-      back: "Back",
-    },
-    nav: { inventory: "Inventory", pos: "Sell", reports: "Reports", settings: "Settings" },
-    inventory: {
-      title: "Inventory",
-      addProduct: "Add product",
-      editProduct: "Edit product",
-      search: "Search product...",
-      allCategories: "All categories",
-      sortBy: "Sort by",
-      sortName: "Name",
-      sortPrice: "Price",
-      sortQty: "Quantity",
-      asc: "Ascending",
-      desc: "Descending",
-      empty: "No products yet",
-      emptyHint: "Add your first product to get started",
-      noResults: "No matching results",
-      lowStock: "Low stock",
-      outOfStock: "Out of stock",
-      stats: {
-        products: "Products",
-        units: "Units",
-        value: "Stock value",
-        lowStock: "To restock",
-      },
-    },
-    form: {
-      name: "Product name",
-      category: "Category",
-      size: "Size",
-      color: "Color",
-      purchasePrice: "Purchase price",
-      salePrice: "Sale price",
-      quantity: "Quantity",
-      lowStockThreshold: "Low stock threshold",
-      image: "Image",
-      barcode: "Barcode",
-      generate: "Generate",
-      scan: "Scan",
-      printBarcode: "Print barcode",
-      save: "Save",
-      cancel: "Cancel",
-      delete: "Delete",
-      confirmDelete: "Delete this product?",
-      required: "Required",
-      saved: "Saved",
-      deleted: "Deleted",
-      pickImage: "Pick image",
-      changeImage: "Change image",
-    },
-    categories: {
-      shirts: "Shirts",
-      pants: "Pants",
-      shoes: "Shoes",
-      jackets: "Jackets",
-      accessories: "Accessories",
-      other: "Other",
-    },
-    pos: {
-      title: "Point of sale",
-      cart: "Cart",
-      emptyCart: "Cart is empty",
-      emptyHint: "Search or scan a barcode",
-      scan: "Scan",
-      addByCode: "Enter code",
-      search: "Search or scan...",
-      subtotal: "Subtotal",
-      discount: "Discount",
-      total: "Total",
-      pay: "Checkout",
-      customerName: "Customer (optional)",
-      paymentMethod: "Payment",
-      cash: "Cash",
-      card: "Card",
-      other: "Other",
-      stockWarning: "Limited stock",
-      notFound: "Product not found",
-      saleSuccess: "Sale completed",
-      printInvoice: "Print invoice",
-      invoice: "Invoice",
-      invoiceNo: "Invoice #",
-      date: "Date",
-      item: "Item",
-      qty: "Qty",
-      price: "Price",
-      lineTotal: "Total",
-      thanks: "Thank you for your purchase",
-    },
-    reports: {
-      title: "Reports",
-      period: "Period",
-      today: "Today",
-      week: "Week",
-      month: "Month",
-      year: "Year",
-      revenue: "Revenue",
-      profit: "Profit",
-      salesCount: "Sales count",
-      avgSale: "Avg. sale",
-      chartSales: "Daily sales",
-      topProducts: "Top products",
-      recentSales: "Recent sales",
-      noSales: "No sales in this period",
-      viewInvoice: "View",
-      units: "units",
-    },
-    settings: {
-      title: "Settings",
-      language: "Language",
-      currency: "Default currency",
-      exchangeRate: "EUR rate (1 EUR = ? DZD)",
-      theme: "Theme",
-      themeLight: "Light",
-      themeDark: "Dark",
-      store: "Store info",
-      storeName: "Store name",
-      storePhone: "Phone",
-      storeAddress: "Address",
-      backup: "Backup",
-      export: "Export data",
-      import: "Import data",
-      saved: "Saved",
-      imported: "Imported",
-      importError: "Invalid file",
-    },
-    scanner: {
-      title: "Scan barcode",
-      hint: "Point the camera at the barcode",
-      cancel: "Cancel",
-      permissionDenied: "Camera permission denied",
-    },
-  },
-} as const;
+export function SettingsPage() {
+  const {
+    t,
+    lang,
+    setLang,
+    theme,
+    setTheme,
+    currency,
+    setCurrency,
+    exchangeRate,
+    setExchangeRate,
+  } = useApp();
+  const [storeName, setStoreName] = useState("");
+  const [storePhone, setStorePhone] = useState("");
+  const [storeAddress, setStoreAddress] = useState("");
+  const importRef = useRef<HTMLInputElement>(null);
 
-type DeepReadonlyToString<T> = T extends string
-  ? string
-  : T extends object
-  ? { [K in keyof T]: DeepReadonlyToString<T[K]> }
-  : T;
+  useEffect(() => {
+    (async () => {
+      setStoreName((await getSetting<string>("storeName")) || "");
+      setStorePhone((await getSetting<string>("storePhone")) || "");
+      setStoreAddress((await getSetting<string>("storeAddress")) || "");
+    })();
+  }, []);
 
-export type Translation = DeepReadonlyToString<typeof translations.ar>;
+  const saveStore = async (
+    key: "storeName" | "storePhone" | "storeAddress",
+    value: string,
+  ) => {
+    await setSetting(key, value);
+  };
+
+  const handleSaveStore = async () => {
+    await Promise.all([
+      setSetting("storeName", storeName),
+      setSetting("storePhone", storePhone),
+      setSetting("storeAddress", storeAddress),
+    ]);
+    toast.success(t.settings.saved);
+  };
+
+  // ── Export ──────────────────────────────────────────────────────────────────
+  const handleExport = async () => {
+    try {
+      const db = await getDB();
+      const [products, sales, settings] = await Promise.all([
+        db.getAll("products"),
+        db.getAll("sales"),
+        db.getAll("settings"),
+      ]);
+
+      const backup = {
+        version: 1,
+        exportedAt: Date.now(),
+        products,
+        sales,
+        settings,
+      };
+
+      const blob = new Blob([JSON.stringify(backup, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `clowthex-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error(t.settings.importError);
+    }
+  };
+
+  // ── Import ──────────────────────────────────────────────────────────────────
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const raw = ev.target?.result as string;
+        const data = JSON.parse(raw);
+
+        if (!Array.isArray(data.products) || !Array.isArray(data.sales) || !Array.isArray(data.settings)) {
+          throw new Error("invalid");
+        }
+
+        const db = await getDB();
+        const tx = db.transaction(["products", "sales", "settings"], "readwrite");
+
+        await tx.objectStore("products").clear();
+        await tx.objectStore("sales").clear();
+        await tx.objectStore("settings").clear();
+
+        for (const p of data.products) await tx.objectStore("products").put(p);
+        for (const s of data.sales) await tx.objectStore("sales").put(s);
+        for (const s of data.settings) await tx.objectStore("settings").put(s);
+
+        await tx.done;
+        toast.success(t.settings.imported);
+
+        // Reload store info from the newly imported settings
+        setStoreName((await getSetting<string>("storeName")) || "");
+        setStorePhone((await getSetting<string>("storePhone")) || "");
+        setStoreAddress((await getSetting<string>("storeAddress")) || "");
+      } catch {
+        toast.error(t.settings.importError);
+      }
+    };
+
+    reader.readAsText(file);
+    // Reset input so the same file can be re-selected if needed
+    e.target.value = "";
+  };
+
+  return (
+    <div className="px-4 py-5 space-y-5">
+      <h2 className="text-xl font-bold">{t.settings.title}</h2>
+
+      <Section icon={<Languages className="w-4 h-4" />}>
+        <div>
+          <Label className="text-xs">{t.settings.language}</Label>
+          <Select value={lang} onValueChange={(v) => setLang(v as Lang)}>
+            <SelectTrigger className="mt-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ar">العربية</SelectItem>
+              <SelectItem value="fr">Français</SelectItem>
+              <SelectItem value="en">English</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </Section>
+
+      <Section icon={<Coins className="w-4 h-4" />}>
+        <div>
+          <Label className="text-xs">{t.settings.currency}</Label>
+          <Select
+            value={currency}
+            onValueChange={(v) => setCurrency(v as Currency)}
+          >
+            <SelectTrigger className="mt-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="DZD">DZD — د.ج</SelectItem>
+              <SelectItem value="EUR">EUR — €</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="text-xs">{t.settings.exchangeRate}</Label>
+          <Input
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step="0.01"
+            value={exchangeRate}
+            onChange={(e) =>
+              setExchangeRate(Math.max(0, Number(e.target.value) || 0))
+            }
+            className="mt-1"
+          />
+        </div>
+      </Section>
+
+      <Section icon={<Palette className="w-4 h-4" />}>
+        <div>
+          <Label className="text-xs">{t.settings.theme}</Label>
+          <div className="grid grid-cols-2 gap-2 mt-1">
+            <Button
+              variant={theme === "light" ? "gold" : "outline"}
+              onClick={() => setTheme("light")}
+              size="sm"
+            >
+              {t.settings.themeLight}
+            </Button>
+            <Button
+              variant={theme === "dark" ? "gold" : "outline"}
+              onClick={() => setTheme("dark")}
+              size="sm"
+            >
+              {t.settings.themeDark}
+            </Button>
+          </div>
+        </div>
+      </Section>
+
+      <Section icon={<Store className="w-4 h-4" />} title={t.settings.store}>
+        <div>
+          <Label className="text-xs">{t.settings.storeName}</Label>
+          <Input
+            value={storeName}
+            onChange={(e) => setStoreName(e.target.value)}
+            onBlur={() => saveStore("storeName", storeName)}
+            className="mt-1"
+          />
+        </div>
+        <div>
+          <Label className="text-xs">{t.settings.storePhone}</Label>
+          <Input
+            value={storePhone}
+            onChange={(e) => setStorePhone(e.target.value)}
+            onBlur={() => saveStore("storePhone", storePhone)}
+            className="mt-1"
+          />
+        </div>
+        <div>
+          <Label className="text-xs">{t.settings.storeAddress}</Label>
+          <Input
+            value={storeAddress}
+            onChange={(e) => setStoreAddress(e.target.value)}
+            onBlur={() => saveStore("storeAddress", storeAddress)}
+            className="mt-1"
+          />
+        </div>
+        <Button variant="gold" className="w-full" onClick={handleSaveStore}>
+          <Save className="w-4 h-4" />
+          {t.form.save}
+        </Button>
+      </Section>
+
+      {/* ── Backup Section ───────────────────────────────────────────────────── */}
+      <Section
+        icon={<DatabaseBackup className="w-4 h-4" />}
+        title={t.settings.backup}
+      >
+        {/* Hidden file input for import */}
+        <input
+          ref={importRef}
+          type="file"
+          accept=".json,application/json"
+          className="hidden"
+          onChange={handleImportFile}
+        />
+
+        <Button
+          variant="gold"
+          className="w-full"
+          onClick={handleExport}
+        >
+          <Download className="w-4 h-4" />
+          {t.settings.export}
+        </Button>
+
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={() => importRef.current?.click()}
+        >
+          <Upload className="w-4 h-4" />
+          {t.settings.import}
+        </Button>
+      </Section>
+    </div>
+  );
+}
+
+function Section({
+  icon,
+  title,
+  children,
+}: {
+  icon: React.ReactNode;
+  title?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border bg-card p-4 shadow-elegant space-y-3">
+      <div className="flex items-center gap-2 text-gold">
+        <span className="w-7 h-7 rounded-md bg-gold/15 grid place-items-center">
+          {icon}
+        </span>
+        {title && <span className="text-sm font-semibold">{title}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
