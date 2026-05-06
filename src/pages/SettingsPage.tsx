@@ -10,11 +10,23 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 import { useApp } from "@/contexts/AppContext";
 import { getDB, getSetting, setSetting } from "@/lib/db";
 import { toast } from "sonner";
 import type { Lang } from "@/i18n/translations";
 import type { Currency } from "@/lib/db";
+import { Directory, Encoding } from '@capacitor/filesystem';
 
 export function SettingsPage() {
   const {
@@ -34,6 +46,9 @@ export function SettingsPage() {
   const [storeAddress, setStoreAddress] = useState("");
   const importRef = useRef<HTMLInputElement>(null);
 
+  const [showExportConfirm, setShowExportConfirm] = useState(false);
+  const [showImportConfirm, setShowImportConfirm] = useState(false);
+
   useEffect(() => {
     const loadSettings = async () => {
       setStoreName(String(await getSetting("storeName") || ""));
@@ -50,7 +65,7 @@ export function SettingsPage() {
     toast.success(t.settings.saved);
   };
 
-  // منطق التصدير
+  // ====================== تصدير محسن ======================
   const handleExport = async () => {
     try {
       const db = await getDB();
@@ -58,45 +73,75 @@ export function SettingsPage() {
       const sales = await db.getAll("sales");
       const settings = await db.getAll("settings");
 
-      const backup = { products, sales, settings, timestamp: Date.now() };
-      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `clowthex-backup-${new Date().toISOString().split('T')[0]}.json`;
-      link.click();
-      URL.revokeObjectURL(url);
-      toast.success(t.settings.exported);
+      const backup = {
+        version: 2,
+        appName: "ClowtheX",
+        exportedAt: new Date().toISOString(),
+        products,
+        sales,
+        settings
+      };
+
+      const fileName = `clowthex-backup-${new Date().toISOString().split('T')[0]}.json`;
+      const jsonString = JSON.stringify(backup, null, 2);
+
+      // محاولة الحفظ بـ Capacitor
+      try {
+        const { Filesystem } = await import('@capacitor/filesystem');
+        await Filesystem.writeFile({
+          path: fileName,
+          data: jsonString,
+          directory: Directory.Documents,
+          encoding: Encoding.UTF8,
+        });
+        toast.success(t.settings.exported || "تم تصدير النسخة الاحتياطية بنجاح");
+      } catch {
+        // طريقة احتياطية
+        const blob = new Blob([jsonString], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        link.click();
+        URL.revokeObjectURL(url);
+        toast.success(t.settings.exported || "تم تصدير النسخة الاحتياطية");
+      }
+
+      setShowExportConfirm(false);
     } catch (error) {
       toast.error("Export failed");
     }
   };
 
-  // منطق الاستيراد
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // ====================== استيراد ======================
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     const reader = new FileReader();
     reader.onload = async (ev) => {
       try {
         const data = JSON.parse(ev.target?.result as string);
-        if (!data.products || !data.sales || !data.settings) throw new Error();
-        
+        if (!data.products || !data.sales || !data.settings) {
+          throw new Error("ملف غير صالح");
+        }
+
         const db = await getDB();
         const tx = db.transaction(["products", "sales", "settings"], "readwrite");
+
         await tx.objectStore("products").clear();
         await tx.objectStore("sales").clear();
         await tx.objectStore("settings").clear();
-        
+
         for (const p of data.products) await tx.objectStore("products").put(p);
         for (const s of data.sales) await tx.objectStore("sales").put(s);
         for (const st of data.settings) await tx.objectStore("settings").put(st);
-        
+
         await tx.done;
-        toast.success(t.settings.imported);
-        setTimeout(() => window.location.reload(), 1000);
+        toast.success(t.settings.imported || "تم استيراد البيانات بنجاح");
+        setTimeout(() => window.location.reload(), 1200);
       } catch (error) {
-        toast.error(t.settings.importError);
+        toast.error(t.settings.importError || "فشل استيراد الملف");
       }
     };
     reader.readAsText(file);
@@ -144,17 +189,75 @@ export function SettingsPage() {
           <Input placeholder={t.settings.storeName} value={storeName} onChange={(e) => setStoreName(e.target.value)} />
           <Input placeholder={t.settings.storePhone} value={storePhone} onChange={(e) => setStorePhone(e.target.value)} />
           <Input placeholder={t.settings.storeAddress} value={storeAddress} onChange={(e) => setStoreAddress(e.target.value)} />
-          <Button variant="gold" className="w-full" onClick={handleSaveStore}><Save className="w-4 h-4 mr-2" />{t.form.save}</Button>
+          <Button variant="gold" className="w-full" onClick={handleSaveStore}>
+            <Save className="w-4 h-4 mr-2" />{t.form.save}
+          </Button>
         </div>
       </Section>
 
+      {/* قسم النسخ الاحتياطي مع رسائل التأكيد */}
       <Section icon={<DatabaseBackup className="w-4 h-4" />} title={t.settings.backup}>
         <div className="space-y-3">
-          <input ref={importRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
-          <Button variant="gold" className="w-full" onClick={handleExport}><Download className="w-4 h-4 mr-2" />{t.settings.export}</Button>
-          <Button variant="outline" className="w-full" onClick={() => importRef.current?.click()}><Upload className="w-4 h-4 mr-2" />{t.settings.import}</Button>
+          <input 
+            ref={importRef} 
+            type="file" 
+            accept=".json" 
+            className="hidden" 
+            onChange={handleImportFile} 
+          />
+
+          <Button variant="gold" className="w-full" onClick={() => setShowExportConfirm(true)}>
+            <Download className="w-4 h-4 mr-2" />
+            {t.settings.export}
+          </Button>
+
+          <Button variant="outline" className="w-full" onClick={() => setShowImportConfirm(true)}>
+            <Upload className="w-4 h-4 mr-2" />
+            {t.settings.import}
+          </Button>
         </div>
       </Section>
+
+      {/* رسالة تأكيد التصدير */}
+      <AlertDialog open={showExportConfirm} onOpenChange={setShowExportConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>تصدير النسخة الاحتياطية؟</AlertDialogTitle>
+            <AlertDialogDescription>
+              سيتم تحميل ملف يحتوي على جميع البيانات.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction onClick={handleExport}>تصدير الآن</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* رسالة تأكيد الاستيراد */}
+      <AlertDialog open={showImportConfirm} onOpenChange={setShowImportConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">⚠️ تحذير هام</AlertDialogTitle>
+            <AlertDialogDescription>
+              هذا الإجراء سيحذف <strong>كل البيانات الحالية</strong> ويستبدلها بالبيانات الجديدة.<br />
+              هل أنت متأكد؟
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction 
+              className="bg-destructive hover:bg-destructive/90"
+              onClick={() => {
+                setShowImportConfirm(false);
+                importRef.current?.click();
+              }}
+            >
+              نعم، استورد
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
