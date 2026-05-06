@@ -4,12 +4,16 @@ const config: CapacitorConfig = {
   appId: "com.haythemgroup.clowthex",
   appName: "ClowtheX",
   webDir: "dist",
-  bundledWebRuntime: false,
   android: {
-    allowMixedContent: false,
+    allowMixedContent: true,
   },
   server: {
-    androidScheme: "https",
+    androidScheme: "http",
+  },
+  plugins: {
+    CapacitorHttp: {
+      enabled: true,
+    },
   },
 };
 
