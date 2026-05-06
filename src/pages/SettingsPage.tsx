@@ -58,18 +58,22 @@ export function SettingsPage() {
   }, []);
 
   const handleSaveStore = async () => {
-    await setSetting("storeName", storeName);
-    await setSetting("storePhone", storePhone);
-    await setSetting("storeAddress", storeAddress);
-    toast.success(t.settings.saved);
+    await Promise.all([
+      setSetting("storeName", storeName),
+      setSetting("storePhone", storePhone),
+      setSetting("storeAddress", storeAddress),
+    ]);
+    toast.success(t.settings.saved || "تم حفظ الإعدادات");
   };
 
   const handleExport = async () => {
     try {
       const db = await getDB();
-      const products = await db.getAll("products");
-      const sales = await db.getAll("sales");
-      const settings = await db.getAll("settings");
+      const [products, sales, settings] = await Promise.all([
+        db.getAll("products"),
+        db.getAll("sales"),
+        db.getAll("settings"),
+      ]);
 
       const backup = {
         version: 2,
@@ -84,13 +88,15 @@ export function SettingsPage() {
       const link = document.createElement("a");
       link.href = url;
       link.download = `clowthex-backup-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      toast.success(t.settings.exported || "تم تصدير النسخة الاحتياطية بنجاح ✅");
+      toast.success("✅ تم تصدير النسخة الاحتياطية بنجاح");
       setShowExportConfirm(false);
     } catch (error) {
-      toast.error("فشل التصدير");
+      toast.error("❌ فشل في التصدير");
     }
   };
 
@@ -118,10 +124,11 @@ export function SettingsPage() {
         for (const st of data.settings) await tx.objectStore("settings").put(st);
 
         await tx.done;
-        toast.success(t.settings.imported || "تم استيراد البيانات بنجاح");
-        setTimeout(() => window.location.reload(), 1200);
+
+        toast.success("✅ تم استيراد البيانات بنجاح");
+        setTimeout(() => window.location.reload(), 1500);
       } catch (error) {
-        toast.error(t.settings.importError || "فشل استيراد الملف");
+        toast.error("❌ فشل استيراد الملف - تأكد من صحة الملف");
       }
     };
     reader.readAsText(file);
@@ -175,33 +182,26 @@ export function SettingsPage() {
         </div>
       </Section>
 
-      <Section icon={<DatabaseBackup className="w-4 h-4" />} title={t.settings.backup}>
+      <Section icon={<DatabaseBackup className="w-4 h-4" />} title={t.settings.backup || "النسخ الاحتياطي"}>
         <div className="space-y-3">
-          <input 
-            ref={importRef} 
-            type="file" 
-            accept=".json" 
-            className="hidden" 
-            onChange={handleImportFile} 
-          />
+          <input ref={importRef} type="file" accept=".json" className="hidden" onChange={handleImportFile} />
 
           <Button variant="gold" className="w-full" onClick={() => setShowExportConfirm(true)}>
-            <Download className="w-4 h-4 mr-2" />
-            {t.settings.export}
+            <Download className="w-4 h-4 mr-2" />{t.settings.export || "تصدير البيانات"}
           </Button>
 
           <Button variant="outline" className="w-full" onClick={() => setShowImportConfirm(true)}>
-            <Upload className="w-4 h-4 mr-2" />
-            {t.settings.import}
+            <Upload className="w-4 h-4 mr-2" />{t.settings.import || "استيراد البيانات"}
           </Button>
         </div>
       </Section>
 
+      {/* Dialogs */}
       <AlertDialog open={showExportConfirm} onOpenChange={setShowExportConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>تصدير النسخة الاحتياطية؟</AlertDialogTitle>
-            <AlertDialogDescription>سيتم تحميل ملف يحتوي على جميع البيانات.</AlertDialogDescription>
+            <AlertDialogDescription>سيتم تحميل ملف يحتوي على كل بيانات المتجر.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>إلغاء</AlertDialogCancel>
@@ -213,22 +213,16 @@ export function SettingsPage() {
       <AlertDialog open={showImportConfirm} onOpenChange={setShowImportConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-destructive">⚠️ تحذير هام</AlertDialogTitle>
+            <AlertDialogTitle className="text-destructive">⚠️ تحذير خطير</AlertDialogTitle>
             <AlertDialogDescription>
-              سيتم حذف <strong>كل البيانات الحالية</strong> واستبدالها بالبيانات الجديدة.<br />
-              هل أنت متأكد؟
+              سيتم حذف <strong>كل البيانات الحالية</strong> في التطبيق واستبدالها بالبيانات من الملف.<br />
+              هذا الإجراء لا يمكن التراجع عنه.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>إلغاء</AlertDialogCancel>
-            <AlertDialogAction 
-              className="bg-destructive hover:bg-destructive/90"
-              onClick={() => {
-                setShowImportConfirm(false);
-                importRef.current?.click();
-              }}
-            >
-              نعم، استورد
+            <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => { setShowImportConfirm(false); importRef.current?.click(); }}>
+              نعم، استورد واستبدل
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
