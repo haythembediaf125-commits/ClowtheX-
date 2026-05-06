@@ -71,8 +71,14 @@ export function SettingsPage() {
       const sales = await db.getAll("sales");
       const settings = await db.getAll("settings");
 
-      const backup = { products, sales, settings, exportedAt: new Date().toISOString() };
-      
+      const backup = {
+        version: 2,
+        exportedAt: new Date().toISOString(),
+        products,
+        sales,
+        settings
+      };
+
       const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -84,7 +90,7 @@ export function SettingsPage() {
       toast.success(t.settings.exported || "تم تصدير النسخة الاحتياطية بنجاح ✅");
       setShowExportConfirm(false);
     } catch (error) {
-      toast.error("Export failed");
+      toast.error("فشل التصدير");
     }
   };
 
@@ -96,7 +102,9 @@ export function SettingsPage() {
     reader.onload = async (ev) => {
       try {
         const data = JSON.parse(ev.target?.result as string);
-        if (!data.products || !data.sales || !data.settings) throw new Error();
+        if (!data.products || !data.sales || !data.settings) {
+          throw new Error("ملف غير صالح");
+        }
 
         const db = await getDB();
         const tx = db.transaction(["products", "sales", "settings"], "readwrite");
@@ -213,7 +221,13 @@ export function SettingsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>إلغاء</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive" onClick={() => {setShowImportConfirm(false); importRef.current?.click();}}>
+            <AlertDialogAction 
+              className="bg-destructive hover:bg-destructive/90"
+              onClick={() => {
+                setShowImportConfirm(false);
+                importRef.current?.click();
+              }}
+            >
               نعم، استورد
             </AlertDialogAction>
           </AlertDialogFooter>
