@@ -35,121 +35,71 @@ export function SettingsPage() {
   const importRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    (async () => {
-      setStoreName((await getSetting<string>("storeName")) || "");
-      setStorePhone((await getSetting<string>("storePhone")) || "");
-      setStoreAddress((await getSetting<string>("storeAddress")) || "");
-    })();
+    const loadSettings = async () => {
+      setStoreName(String(await getSetting("storeName") || ""));
+      setStorePhone(String(await getSetting("storePhone") || ""));
+      setStoreAddress(String(await getSetting("storeAddress") || ""));
+    };
+    loadSettings();
   }, []);
 
-  const saveStore = async (
-    key: "storeName" | "storePhone" | "storeAddress",
-    value: string
-  ) => {
-    await setSetting(key, value);
-  };
-
   const handleSaveStore = async () => {
-    await Promise.all([
-      setSetting("storeName", storeName),
-      setSetting("storePhone", storePhone),
-      setSetting("storeAddress", storeAddress),
-    ]);
+    await setSetting("storeName", storeName);
+    await setSetting("storePhone", storePhone);
+    await setSetting("storeAddress", storeAddress);
     toast.success(t.settings.saved);
   };
 
-  // --- Export Logic
+  // منطق التصدير
   const handleExport = async () => {
     try {
       const db = await getDB();
-      // Fetch all data from the three main object stores
-      const [products, sales, settings] = await Promise.all([
-        db.getAll("products"),
-        db.getAll("sales"),
-        db.getAll("settings"),
-      ]);
+      const products = await db.getAll("products");
+      const sales = await db.getAll("sales");
+      const settings = await db.getAll("settings");
 
-      const backupData = {
-        version: 1,
-        exportedAt: Date.now(),
-        products,
-        sales,
-        settings,
-      };
-
-      const blob = new Blob([JSON.stringify(backupData, null, 2)], {
-        type: "application/json",
-      });
+      const backup = { products, sales, settings, timestamp: Date.now() };
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `clowthex-backup-${new Date().toISOString().slice(0, 10)}.json`;
-      document.body.appendChild(link);
+      link.download = `clowthex-backup-${new Date().toISOString().split('T')[0]}.json`;
       link.click();
-      document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      
-      // Use translation if available, otherwise fallback to Arabic
-      toast.success(t.settings.exported || "تم تصدير النسخة الاحتياطية بنجاح");
+      toast.success(t.settings.exported);
     } catch (error) {
-      console.error("Export failed:", error);
-      toast.error("فشل تصدير البيانات");
+      toast.error("Export failed");
     }
   };
 
-  // --- Import Logic
-  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // منطق الاستيراد
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
-    reader.onload = async (event) => {
+    reader.onload = async (ev) => {
       try {
-        const content = event.target?.result as string;
-        const data = JSON.parse(content);
-
-        // Basic validation of the backup file structure
-        if (!data.products || !data.sales || !data.settings) {
-          throw new Error("Invalid backup file format");
-        }
-
+        const data = JSON.parse(ev.target?.result as string);
+        if (!data.products || !data.sales || !data.settings) throw new Error();
+        
         const db = await getDB();
-        // Start a readwrite transaction for all stores
         const tx = db.transaction(["products", "sales", "settings"], "readwrite");
-
-        // Clear existing data
-        await Promise.all([
-          tx.objectStore("products").clear(),
-          tx.objectStore("sales").clear(),
-          tx.objectStore("settings").clear(),
-        ]);
-
-        // Restore data
-        for (const item of data.products) await tx.objectStore("products").put(item);
-        for (const item of data.sales) await tx.objectStore("sales").put(item);
-        for (const item of data.settings) await tx.objectStore("settings").put(item);
-
+        await tx.objectStore("products").clear();
+        await tx.objectStore("sales").clear();
+        await tx.objectStore("settings").clear();
+        
+        for (const p of data.products) await tx.objectStore("products").put(p);
+        for (const s of data.sales) await tx.objectStore("sales").put(s);
+        for (const st of data.settings) await tx.objectStore("settings").put(st);
+        
         await tx.done;
-        
-        toast.success(t.settings.imported || "تم استيراد البيانات بنجاح");
-
-        // Refresh local state for store info
-        setStoreName((await getSetting<string>("storeName")) || "");
-        setStorePhone((await getSetting<string>("storePhone")) || "");
-        setStoreAddress((await getSetting<string>("storeAddress")) || "");
-        
-        // Force reload to ensure all contexts (like inventory and sales) are updated
-        setTimeout(() => {
-          window.location.reload();
-        }, 1500);
+        toast.success(t.settings.imported);
+        setTimeout(() => window.location.reload(), 1000);
       } catch (error) {
-        console.error("Import failed:", error);
-        toast.error(t.settings.importError || "فشل استيراد الملف، تأكد من أنه ملف نسخة احتياطية صحيح");
+        toast.error(t.settings.importError);
       }
     };
-
     reader.readAsText(file);
-    // Clear the input so the same file can be uploaded again if needed
     e.target.value = "";
   };
 
@@ -157,176 +107,63 @@ export function SettingsPage() {
     <div className="px-4 py-5 space-y-5">
       <h2 className="text-xl font-bold">{t.settings.title}</h2>
 
-      {/* Language Section */}
-      <Section icon={<Languages className="w-4 h-4" />}>
-        <div>
-          <Label className="text-xs">{t.settings.language}</Label>
-          <Select value={lang} onValueChange={(v) => setLang(v as Lang)}>
-            <SelectTrigger className="mt-1">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ar">العربية</SelectItem>
-              <SelectItem value="fr">Français</SelectItem>
-              <SelectItem value="en">English</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      <Section icon={<Languages className="w-4 h-4" />} title={t.settings.language}>
+        <Select value={lang} onValueChange={(v) => setLang(v as Lang)}>
+          <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ar">العربية</SelectItem>
+            <SelectItem value="fr">Français</SelectItem>
+            <SelectItem value="en">English</SelectItem>
+          </SelectContent>
+        </Select>
       </Section>
 
-      {/* Currency Section */}
-      <Section icon={<Coins className="w-4 h-4" />}>
-        <div>
-          <Label className="text-xs">{t.settings.currency}</Label>
-          <Select
-            value={currency}
-            onValueChange={(v) => setCurrency(v as Currency)}
-          >
-            <SelectTrigger className="mt-1">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="DZD">DZD - د.ج</SelectItem>
-              <SelectItem value="EUR">EUR - €</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
+      <Section icon={<Coins className="w-4 h-4" />} title={t.settings.currency}>
+        <Select value={currency} onValueChange={(v) => setCurrency(v as Currency)}>
+          <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="DZD">DZD</SelectItem>
+            <SelectItem value="EUR">EUR</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="mt-3">
           <Label className="text-xs">{t.settings.exchangeRate}</Label>
-          <Input
-            type="number"
-            inputMode="decimal"
-            min="0"
-            step="0.01"
-            value={exchangeRate}
-            onChange={(e) =>
-              setExchangeRate(Math.max(0, Number(e.target.value) || 0))
-            }
-            className="mt-1"
-          />
+          <Input type="number" value={exchangeRate} onChange={(e) => setExchangeRate(Number(e.target.value))} className="mt-1" />
         </div>
       </Section>
 
-      {/* Theme Section */}
-      <Section icon={<Palette className="w-4 h-4" />}>
-        <div>
-          <Label className="text-xs">{t.settings.theme}</Label>
-          <div className="grid grid-cols-2 gap-2 mt-1">
-            <Button
-              variant={theme === "light" ? "gold" : "outline"}
-              onClick={() => setTheme("light")}
-              size="sm"
-            >
-              {t.settings.themeLight}
-            </Button>
-            <Button
-              variant={theme === "dark" ? "gold" : "outline"}
-              onClick={() => setTheme("dark")}
-              size="sm"
-            >
-              {t.settings.themeDark}
-            </Button>
-          </div>
+      <Section icon={<Palette className="w-4 h-4" />} title={t.settings.theme}>
+        <div className="grid grid-cols-2 gap-2 mt-1">
+          <Button variant={theme === "light" ? "gold" : "outline"} onClick={() => setTheme("light")}>{t.settings.themeLight}</Button>
+          <Button variant={theme === "dark" ? "gold" : "outline"} onClick={() => setTheme("dark")}>{t.settings.themeDark}</Button>
         </div>
       </Section>
 
-      {/* Store Info Section */}
       <Section icon={<Store className="w-4 h-4" />} title={t.settings.store}>
-        <div>
-          <Label className="text-xs">{t.settings.storeName}</Label>
-          <Input
-            value={storeName}
-            onChange={(e) => setStoreName(e.target.value)}
-            onBlur={() => saveStore("storeName", storeName)}
-            className="mt-1"
-          />
+        <div className="space-y-3">
+          <Input placeholder={t.settings.storeName} value={storeName} onChange={(e) => setStoreName(e.target.value)} />
+          <Input placeholder={t.settings.storePhone} value={storePhone} onChange={(e) => setStorePhone(e.target.value)} />
+          <Input placeholder={t.settings.storeAddress} value={storeAddress} onChange={(e) => setStoreAddress(e.target.value)} />
+          <Button variant="gold" className="w-full" onClick={handleSaveStore}><Save className="w-4 h-4 mr-2" />{t.form.save}</Button>
         </div>
-        <div>
-          <Label className="text-xs">{t.settings.storePhone}</Label>
-          <Input
-            value={storePhone}
-            onChange={(e) => setStorePhone(e.target.value)}
-            onBlur={() => saveStore("storePhone", storePhone)}
-            className="mt-1"
-          />
-        </div>
-        <div>
-          <Label className="text-xs">{t.settings.storeAddress}</Label>
-          <Input
-            value={storeAddress}
-            onChange={(e) => setStoreAddress(e.target.value)}
-            onBlur={() => saveStore("storeAddress", storeAddress)}
-            className="mt-1"
-          />
-        </div>
-        <Button variant="gold" className="w-full" onClick={handleSaveStore}>
-          <Save className="w-4 h-4 mr-2" />
-          {t.form.save}
-        </Button>
       </Section>
 
-      {/* Backup & Restore Section */}
-      <Section
-        icon={<DatabaseBackup className="w-4 h-4" />}
-        title={t.settings.backup || "النسخ الاحتياطي"}
-      >
+      <Section icon={<DatabaseBackup className="w-4 h-4" />} title={t.settings.backup}>
         <div className="space-y-3">
-          {/* Hidden file input */}
-          <input
-            ref={importRef}
-            type="file"
-            accept=".json,application/json"
-            className="hidden"
-            onChange={handleImportFile}
-          />
-
-          <Button
-            variant="gold"
-            className="w-full"
-            onClick={handleExport}
-          >
-            <Download className="w-4 h-4 mr-2" />
-            {t.settings.export || "تصدير البيانات"}
-          </Button>
-
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => importRef.current?.click()}
-          >
-            <Upload className="w-4 h-4 mr-2" />
-            {t.settings.import || "استيراد البيانات"}
-          </Button>
-          
-          <p className="text-[10px] text-muted-foreground text-center px-2">
-            {lang === "ar" 
-              ? "ملاحظة: استيراد البيانات سيؤدي إلى مسح كافة البيانات الحالية واستبدالها ببيانات الملف."
-              : "Note: Importing data will overwrite all current data with the file content."}
-          </p>
+          <input ref={importRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
+          <Button variant="gold" className="w-full" onClick={handleExport}><Download className="w-4 h-4 mr-2" />{t.settings.export}</Button>
+          <Button variant="outline" className="w-full" onClick={() => importRef.current?.click()}><Upload className="w-4 h-4 mr-2" />{t.settings.import}</Button>
         </div>
       </Section>
     </div>
   );
 }
 
-function Section({
-  children,
-  icon,
-  title,
-}: {
-  children: React.ReactNode;
-  icon?: React.ReactNode;
-  title?: string;
-}) {
+function Section({ children, icon, title }: { children: React.ReactNode; icon?: React.ReactNode; title?: string }) {
   return (
-    <div className="bg-card rounded-xl border border-border p-4 space-y-4 shadow-sm">
-      {(title || icon) && (
-        <div className="flex items-center gap-2 text-sm font-semibold text-foreground/70 border-b border-border/50 pb-2">
-          {icon}
-          {title}
-        </div>
-      )}
-      <div className="space-y-4">{children}</div>
+    <div className="bg-card rounded-xl border p-4 space-y-2 shadow-sm">
+      <div className="flex items-center gap-2 text-sm font-semibold border-b pb-2 mb-2">{icon}{title}</div>
+      {children}
     </div>
   );
 }
