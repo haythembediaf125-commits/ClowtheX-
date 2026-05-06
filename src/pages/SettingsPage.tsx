@@ -85,7 +85,6 @@ export function SettingsPage() {
       const fileName = `clowthex-backup-${new Date().toISOString().split('T')[0]}.json`;
       const jsonString = JSON.stringify(backup, null, 2);
 
-      // محاولة الحفظ بـ Capacitor
       try {
         const { Filesystem } = await import('@capacitor/filesystem');
         await Filesystem.writeFile({
@@ -94,9 +93,9 @@ export function SettingsPage() {
           directory: Directory.Documents,
           encoding: Encoding.UTF8,
         });
-        toast.success(t.settings.exported || "تم تصدير النسخة الاحتياطية بنجاح");
+        toast.success(t.settings.exported || "تم تصدير النسخة الاحتياطية بنجاح ✅");
       } catch {
-        // طريقة احتياطية
+        // طريقة احتياطية (للمتصفح)
         const blob = new Blob([jsonString], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
@@ -104,7 +103,7 @@ export function SettingsPage() {
         link.download = fileName;
         link.click();
         URL.revokeObjectURL(url);
-        toast.success(t.settings.exported || "تم تصدير النسخة الاحتياطية");
+        toast.success(t.settings.exported || "تم تصدير النسخة الاحتياطية ✅");
       }
 
       setShowExportConfirm(false);
@@ -195,7 +194,6 @@ export function SettingsPage() {
         </div>
       </Section>
 
-      {/* قسم النسخ الاحتياطي مع رسائل التأكيد */}
       <Section icon={<DatabaseBackup className="w-4 h-4" />} title={t.settings.backup}>
         <div className="space-y-3">
           <input 
@@ -218,13 +216,13 @@ export function SettingsPage() {
         </div>
       </Section>
 
-      {/* رسالة تأكيد التصدير */}
+      {/* Dialogs */}
       <AlertDialog open={showExportConfirm} onOpenChange={setShowExportConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>تصدير النسخة الاحتياطية؟</AlertDialogTitle>
             <AlertDialogDescription>
-              سيتم تحميل ملف يحتوي على جميع البيانات.
+              سيتم تحميل ملف يحتوي على جميع البيانات الحالية.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -234,13 +232,12 @@ export function SettingsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* رسالة تأكيد الاستيراد */}
       <AlertDialog open={showImportConfirm} onOpenChange={setShowImportConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="text-destructive">⚠️ تحذير هام</AlertDialogTitle>
             <AlertDialogDescription>
-              هذا الإجراء سيحذف <strong>كل البيانات الحالية</strong> ويستبدلها بالبيانات الجديدة.<br />
+              سيتم حذف <strong>كل البيانات الحالية</strong> نهائياً واستبدالها بالبيانات من الملف.<br />
               هل أنت متأكد؟
             </AlertDialogDescription>
           </AlertDialogHeader>
