@@ -26,7 +26,6 @@ import { getDB, getSetting, setSetting } from "@/lib/db";
 import { toast } from "sonner";
 import type { Lang } from "@/i18n/translations";
 import type { Currency } from "@/lib/db";
-import { Directory, Encoding } from '@capacitor/filesystem';
 
 export function SettingsPage() {
   const {
@@ -65,7 +64,6 @@ export function SettingsPage() {
     toast.success(t.settings.saved);
   };
 
-  // ====================== تصدير محسن ======================
   const handleExport = async () => {
     try {
       const db = await getDB();
@@ -73,46 +71,23 @@ export function SettingsPage() {
       const sales = await db.getAll("sales");
       const settings = await db.getAll("settings");
 
-      const backup = {
-        version: 2,
-        appName: "ClowtheX",
-        exportedAt: new Date().toISOString(),
-        products,
-        sales,
-        settings
-      };
+      const backup = { products, sales, settings, exportedAt: new Date().toISOString() };
+      
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `clowthex-backup-${new Date().toISOString().split('T')[0]}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
 
-      const fileName = `clowthex-backup-${new Date().toISOString().split('T')[0]}.json`;
-      const jsonString = JSON.stringify(backup, null, 2);
-
-      try {
-        const { Filesystem } = await import('@capacitor/filesystem');
-        await Filesystem.writeFile({
-          path: fileName,
-          data: jsonString,
-          directory: Directory.Documents,
-          encoding: Encoding.UTF8,
-        });
-        toast.success(t.settings.exported || "تم تصدير النسخة الاحتياطية بنجاح ✅");
-      } catch {
-        // طريقة احتياطية (للمتصفح)
-        const blob = new Blob([jsonString], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = fileName;
-        link.click();
-        URL.revokeObjectURL(url);
-        toast.success(t.settings.exported || "تم تصدير النسخة الاحتياطية ✅");
-      }
-
+      toast.success(t.settings.exported || "تم تصدير النسخة الاحتياطية بنجاح ✅");
       setShowExportConfirm(false);
     } catch (error) {
       toast.error("Export failed");
     }
   };
 
-  // ====================== استيراد ======================
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -121,9 +96,7 @@ export function SettingsPage() {
     reader.onload = async (ev) => {
       try {
         const data = JSON.parse(ev.target?.result as string);
-        if (!data.products || !data.sales || !data.settings) {
-          throw new Error("ملف غير صالح");
-        }
+        if (!data.products || !data.sales || !data.settings) throw new Error();
 
         const db = await getDB();
         const tx = db.transaction(["products", "sales", "settings"], "readwrite");
@@ -216,14 +189,11 @@ export function SettingsPage() {
         </div>
       </Section>
 
-      {/* Dialogs */}
       <AlertDialog open={showExportConfirm} onOpenChange={setShowExportConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>تصدير النسخة الاحتياطية؟</AlertDialogTitle>
-            <AlertDialogDescription>
-              سيتم تحميل ملف يحتوي على جميع البيانات الحالية.
-            </AlertDialogDescription>
+            <AlertDialogDescription>سيتم تحميل ملف يحتوي على جميع البيانات.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>إلغاء</AlertDialogCancel>
@@ -237,19 +207,13 @@ export function SettingsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle className="text-destructive">⚠️ تحذير هام</AlertDialogTitle>
             <AlertDialogDescription>
-              سيتم حذف <strong>كل البيانات الحالية</strong> نهائياً واستبدالها بالبيانات من الملف.<br />
+              سيتم حذف <strong>كل البيانات الحالية</strong> واستبدالها بالبيانات الجديدة.<br />
               هل أنت متأكد؟
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>إلغاء</AlertDialogCancel>
-            <AlertDialogAction 
-              className="bg-destructive hover:bg-destructive/90"
-              onClick={() => {
-                setShowImportConfirm(false);
-                importRef.current?.click();
-              }}
-            >
+            <AlertDialogAction className="bg-destructive" onClick={() => {setShowImportConfirm(false); importRef.current?.click();}}>
               نعم، استورد
             </AlertDialogAction>
           </AlertDialogFooter>
