@@ -10,7 +10,7 @@ interface Props {
   onDetected: (code: string) => void;
 }
 
-const SCANNER_ID = "html5qr-scanner";
+const SCANNER_ID = "clowthex-qr-region";
 
 export function BarcodeScanner({ open, onOpenChange, onDetected }: Props) {
   const { t } = useApp();
@@ -21,16 +21,13 @@ export function BarcodeScanner({ open, onOpenChange, onDetected }: Props) {
   const stopScanner = async () => {
     try {
       if (scannerRef.current) {
-        const state = scannerRef.current.getState();
-        if (state === 2 || state === 3) {
-          await scannerRef.current.stop();
-        }
-        scannerRef.current.clear();
+        const s = scannerRef.current;
         scannerRef.current = null;
+        const state = s.getState();
+        if (state === 2 || state === 3) await s.stop();
+        s.clear();
       }
-    } catch {
-      // تجاهل أخطاء الإيقاف
-    }
+    } catch { /* ignore */ }
   };
 
   useEffect(() => {
@@ -43,27 +40,23 @@ export function BarcodeScanner({ open, onOpenChange, onDetected }: Props) {
 
     let alive = true;
 
-    const startScanner = async () => {
-      await new Promise((r) => setTimeout(r, 300));
+    (async () => {
+      await new Promise((r) => setTimeout(r, 400));
       if (!alive) return;
 
       try {
-        const html5QrCode = new Html5Qrcode(SCANNER_ID, { verbose: false });
-        scannerRef.current = html5QrCode;
+        const scanner = new Html5Qrcode(SCANNER_ID, { verbose: false });
+        scannerRef.current = scanner;
 
-        await html5QrCode.start(
+        await scanner.start(
           { facingMode: "environment" },
-          {
-            fps: 10,
-            qrbox: { width: 250, height: 180 },
-            aspectRatio: 1.5,
-            disableFlip: false,
-          },
-          (decodedText) => {
+          { fps: 10, qrbox: { width: 240, height: 160 }, aspectRatio: 1.77 },
+          (text) => {
             if (!alive) return;
-            stopScanner();
-            onDetected(decodedText);
-            onOpenChange(false);
+            stopScanner().then(() => {
+              onDetected(text);
+              onOpenChange(false);
+            });
           },
           () => {}
         );
@@ -72,75 +65,112 @@ export function BarcodeScanner({ open, onOpenChange, onDetected }: Props) {
       } catch (err: any) {
         if (!alive) return;
         setStatus("error");
-        const msg = err?.message ?? String(err);
-        if (msg.includes("Permission") || msg.includes("NotAllowed") || msg.includes("permission")) {
-          setErrorMsg("❌ تم رفض إذن الكاميرا\nاذهب إلى إعدادات جهازك → التطبيقات → ClowtheX → الأذونات → فعّل الكاميرا");
-        } else if (msg.includes("NotFound") || msg.includes("Devices not found")) {
+        const msg = String(err?.message ?? err);
+        if (/NotAllowed|Permission|permission/i.test(msg)) {
+          setErrorMsg("❌ لا يمكن الوصول إلى الكاميرا\nاذهب إلى إعدادات الجهاز ← التطبيقات ← ClowtheX ← الأذونات ← فعّل الكاميرا");
+        } else if (/NotFound|not found|Devices/i.test(msg)) {
           setErrorMsg("❌ لم يتم العثور على كاميرا في هذا الجهاز");
-        } else if (msg.includes("NotReadable") || msg.includes("Could not start")) {
-          setErrorMsg("❌ الكاميرا مستخدمة من تطبيق آخر\nأغلق التطبيقات الأخرى وأعد المحاولة");
+        } else if (/NotReadable|Could not start/i.test(msg)) {
+          setErrorMsg("❌ الكاميرا مستخدمة من تطبيق آخر\nأغلق التطبيقات وأعد المحاولة");
         } else {
-          setErrorMsg("❌ خطأ في الكاميرا:\n" + msg);
+          setErrorMsg("❌ خطأ في تشغيل الكاميرا:\n" + msg);
         }
       }
-    };
+    })();
 
-    startScanner();
     return () => { alive = false; stopScanner(); };
   }, [open]);
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col">
-      <div className="flex items-center justify-between px-4 py-3 shrink-0 bg-black/90 backdrop-blur">
+    <div className="fixed inset-0 z-50 flex flex-col" style={{ background: "#000" }}>
+
+      {/* شريط العنوان */}
+      <div className="flex items-center justify-between px-4 py-3 shrink-0" style={{ background: "#000" }}>
         <span className="text-white font-semibold text-base">{t.scanner.title}</span>
         <Button
           variant="ghost"
           size="icon"
-          className="text-white hover:text-white hover:bg-white/20"
+          className="text-white hover:bg-white/20"
           onClick={() => { stopScanner(); onOpenChange(false); }}
         >
           <X className="w-5 h-5" />
         </Button>
       </div>
 
-      <div className="flex-1 relative overflow-hidden bg-black flex flex-col items-center justify-center">
-        <div id={SCANNER_ID} className="w-full max-w-sm" style={{ minHeight: 300 }} />
+      {/* منطقة الكاميرا */}
+      <div className="flex-1 relative flex flex-col items-center justify-center overflow-hidden" style={{ background: "#000" }}>
 
+        {/* حاوية الماسح المخفية بالكامل خلف واجهتنا */}
+        <div
+          id={SCANNER_ID}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            opacity: status === "scanning" ? 1 : 0,
+            pointerEvents: "none",
+          }}
+        />
+
+        {/* شاشة التحميل */}
         {status === "loading" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black">
-            <Camera className="w-14 h-14 text-white animate-pulse" />
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4" style={{ background: "#000" }}>
+            <Camera className="w-16 h-16 text-white animate-pulse" />
             <p className="text-white text-sm">جاري تشغيل الكاميرا...</p>
           </div>
         )}
 
+        {/* إطار المسح فوق الفيديو */}
+        {status === "scanning" && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 pointer-events-none">
+            <div className="relative w-64 h-44">
+              {/* زوايا الإطار */}
+              <span className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-yellow-400 rounded-tl-lg" />
+              <span className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-yellow-400 rounded-tr-lg" />
+              <span className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-yellow-400 rounded-bl-lg" />
+              <span className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-yellow-400 rounded-br-lg" />
+              {/* خط المسح المتحرك */}
+              <div className="absolute inset-x-2 h-0.5 bg-yellow-400 rounded" style={{ animation: "scanline 2s ease-in-out infinite" }} />
+            </div>
+            <p className="text-white text-sm bg-black/70 px-4 py-2 rounded-full">{t.scanner.hint}</p>
+          </div>
+        )}
+
+        {/* شاشة الخطأ */}
         {status === "error" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black px-8">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-8" style={{ background: "#000" }}>
             <p className="text-white text-sm bg-red-900/90 px-5 py-4 rounded-2xl text-center leading-relaxed whitespace-pre-line">
               {errorMsg}
             </p>
             <Button
+              className="border-white/40 text-white hover:bg-white/10"
               variant="outline"
-              className="text-white border-white/40 hover:bg-white/10"
               onClick={() => { stopScanner(); onOpenChange(false); }}
             >
               إغلاق
             </Button>
           </div>
         )}
-
-        {status === "scanning" && (
-          <p className="mt-4 text-white text-sm bg-black/60 px-4 py-2 rounded-full">
-            {t.scanner.hint}
-          </p>
-        )}
       </div>
 
       <style>{`
-        #${SCANNER_ID} video { border-radius: 12px; }
-        #${SCANNER_ID} img { display: none !important; }
-        #${SCANNER_ID} > div:last-child { display: none !important; }
+        @keyframes scanline {
+          0%   { top: 4px; }
+          50%  { top: calc(100% - 4px); }
+          100% { top: 4px; }
+        }
+        #${SCANNER_ID} > * { display: none !important; }
+        #${SCANNER_ID} video {
+          display: block !important;
+          position: absolute !important;
+          inset: 0 !important;
+          width: 100% !important;
+          height: 100% !important;
+          object-fit: cover !important;
+        }
       `}</style>
     </div>
   );
