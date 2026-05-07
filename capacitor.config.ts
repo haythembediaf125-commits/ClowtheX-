@@ -10,11 +10,6 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: "http",
   },
-  plugins: {
-    CapacitorHttp: {
-      enabled: true,
-    },
-  },
 };
 
 export default config;
