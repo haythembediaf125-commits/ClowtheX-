@@ -8,7 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -26,15 +26,21 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      - name: Build web app with correct base path
+      - name: Build web app
         run: npm run build
-        env:
-          BASE_PATH: "./"
 
       - name: Setup Android platform
         run: |
           if [ ! -d android ]; then npx cap add android; fi
           npx cap sync android
+
+      - name: Generate icons from icon.png
+        run: |
+          npm install --no-save @capacitor/assets@^3.0.5
+          mkdir -p resources
+          cp icon.png resources/icon.png
+          cp icon.png resources/icon-foreground.png
+          npx @capacitor/assets generate --android --iconBackgroundColor '#0f172a' --iconBackgroundColorDark '#0f172a' --splashBackgroundColor '#0f172a' --splashBackgroundColorDark '#0f172a' || true
 
       - name: Fix AndroidManifest
         run: |
@@ -45,6 +51,7 @@ jobs:
           if ! grep -q "usesCleartextTraffic" "$MANIFEST"; then
             sed -i 's|android:label="@string/app_name"|android:label="@string/app_name"\n        android:usesCleartextTraffic="true"|' "$MANIFEST"
           fi
+          cat "$MANIFEST"
 
       - name: Replace MainActivity
         run: |
@@ -62,7 +69,8 @@ jobs:
           chmod +x ./gradlew
           ./gradlew assembleDebug --no-daemon
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
           name: ClowtheX-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
