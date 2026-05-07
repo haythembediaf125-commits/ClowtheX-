@@ -26,21 +26,25 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      - name: Build web app
-        run: npm run build
+      - name: Build web app (mobile mode with correct base path)
+        run: npm run build:mobile
 
       - name: Setup Android platform
         run: |
           if [ ! -d android ]; then npx cap add android; fi
           npx cap sync android
 
-      - name: Generate icons from icon.png
+      - name: Restore icon
         run: |
           npm install --no-save @capacitor/assets@^3.0.5
           mkdir -p resources
           cp icon.png resources/icon.png
           cp icon.png resources/icon-foreground.png
-          npx @capacitor/assets generate --android --iconBackgroundColor '#0f172a' --iconBackgroundColorDark '#0f172a' --splashBackgroundColor '#0f172a' --splashBackgroundColorDark '#0f172a' || true
+          npx @capacitor/assets generate --android \
+            --iconBackgroundColor '#0f172a' \
+            --iconBackgroundColorDark '#0f172a' \
+            --splashBackgroundColor '#0f172a' \
+            --splashBackgroundColorDark '#0f172a' || true
 
       - name: Fix AndroidManifest
         run: |
