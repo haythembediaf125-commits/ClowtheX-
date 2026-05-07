@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/contexts/AppContext";
 import { Button } from "@/components/ui/button";
 import { X, Camera } from "lucide-react";
+import { Html5Qrcode } from "html5-qrcode";
 
 interface Props {
   open: boolean;
@@ -9,178 +10,134 @@ interface Props {
   onDetected: (code: string) => void;
 }
 
+const SCANNER_ID = "clowthex-qr-region";
+
 export function BarcodeScanner({ open, onOpenChange, onDetected }: Props) {
   const { t } = useApp();
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
   const [status, setStatus] = useState<"loading" | "scanning" | "error">("loading");
   const [errorMsg, setErrorMsg] = useState("");
 
-  const stopAll = () => {
-    if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
-    if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
-    if (videoRef.current) { videoRef.current.srcObject = null; }
+  const stopScanner = async () => {
+    try {
+      if (scannerRef.current) {
+        const s = scannerRef.current;
+        scannerRef.current = null;
+        const state = s.getState();
+        if (state === 2 || state === 3) await s.stop();
+        s.clear();
+      }
+    } catch { /* ignore */ }
   };
 
   useEffect(() => {
-    if (!open) { stopAll(); setStatus("loading"); setErrorMsg(""); return; }
+    if (!open) {
+      stopScanner();
+      setStatus("loading");
+      setErrorMsg("");
+      return;
+    }
 
     let alive = true;
 
     (async () => {
+      await new Promise((r) => setTimeout(r, 400));
+      if (!alive) return;
+
       try {
-        // طلب الكاميرا الخلفية
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: false,
-        });
+        const scanner = new Html5Qrcode(SCANNER_ID, { verbose: false });
+        scannerRef.current = scanner;
 
-        if (!alive) { stream.getTracks().forEach(t => t.stop()); return; }
+        await scanner.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 240, height: 160 }, aspectRatio: 1.77 },
+          (text) => {
+            if (!alive) return;
+            stopScanner().then(() => {
+              onDetected(text);
+              onOpenChange(false);
+            });
+          },
+          () => {}
+        );
 
-        streamRef.current = stream;
-        const vid = videoRef.current!;
-        vid.srcObject = stream;
-
-        await new Promise<void>((res, rej) => {
-          vid.onloadedmetadata = () => res();
-          vid.onerror = () => rej(new Error("video error"));
-          setTimeout(() => rej(new Error("timeout")), 8000);
-        });
-
-        await vid.play();
-        if (!alive) return;
-        setStatus("scanning");
-
-        // محاولة BarcodeDetector (الأجهزة الحديثة)
-        if ("BarcodeDetector" in window) {
-          // @ts-ignore
-          const detector = new window.BarcodeDetector({ formats: ["ean_13","ean_8","code_128","code_39","qr_code","upc_a","upc_e"] });
-          intervalRef.current = setInterval(async () => {
-            if (!vid || vid.readyState < 2) return;
-            try {
-              // @ts-ignore
-              const results = await detector.detect(vid);
-              if (results.length > 0 && alive) {
-                stopAll();
-                onDetected(results[0].rawValue);
-                onOpenChange(false);
-              }
-            } catch { /* تجاهل أخطاء الإطار */ }
-          }, 400);
-
-        } else {
-          // Fallback: Canvas + jscanify عبر CDN
-          const canvas = canvasRef.current!;
-          const ctx = canvas.getContext("2d")!;
-
-          intervalRef.current = setInterval(() => {
-            if (!vid || vid.readyState < 2 || !alive) return;
-            canvas.width = vid.videoWidth;
-            canvas.height = vid.videoHeight;
-            ctx.drawImage(vid, 0, 0, canvas.width, canvas.height);
-
-            // محاولة قراءة QR بواسطة jsQR
-            try {
-              const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-              // @ts-ignore
-              if (typeof window.jsQR !== "undefined") {
-                // @ts-ignore
-                const result = window.jsQR(imageData.data, imageData.width, imageData.height);
-                if (result && alive) {
-                  stopAll();
-                  onDetected(result.data);
-                  onOpenChange(false);
-                }
-              }
-            } catch { /* تجاهل */ }
-          }, 500);
-
-          // تحميل jsQR من CDN
-          if (!document.getElementById("jsqr-script")) {
-            const script = document.createElement("script");
-            script.id = "jsqr-script";
-            script.src = "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js";
-            document.head.appendChild(script);
-          }
-        }
-
+        if (alive) setStatus("scanning");
       } catch (err: any) {
         if (!alive) return;
         setStatus("error");
-        if (err?.name === "NotAllowedError") {
-          setErrorMsg("❌ تم رفض إذن الكاميرا — اذهب لإعدادات الجهاز وأعط الإذن");
-        } else if (err?.name === "NotFoundError") {
-          setErrorMsg("❌ لم يتم العثور على كاميرا في هذا الجهاز");
+        const msg = String(err?.message ?? err);
+        if (/NotAllowed|Permission|permission/i.test(msg)) {
+          setErrorMsg("❌ لا يمكن الوصول إلى الكاميرا\nاذهب: إعدادات ← التطبيقات ← ClowtheX ← الأذونات ← فعّل الكاميرا");
+        } else if (/NotFound|not found|Devices/i.test(msg)) {
+          setErrorMsg("❌ لم يتم العثور على كاميرا");
+        } else if (/NotReadable|Could not start/i.test(msg)) {
+          setErrorMsg("❌ الكاميرا مستخدمة من تطبيق آخر\nأغلق التطبيقات وأعد المحاولة");
         } else {
-          setErrorMsg("❌ خطأ في تشغيل الكاميرا: " + (err?.message ?? "غير معروف"));
+          setErrorMsg("❌ خطأ: " + msg);
         }
       }
     })();
 
-    return () => { alive = false; stopAll(); };
+    return () => { alive = false; stopScanner(); };
   }, [open]);
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 shrink-0 bg-black/80">
+    <div className="fixed inset-0 z-50 flex flex-col" style={{ background: "#000" }}>
+      <div className="flex items-center justify-between px-4 py-3 shrink-0" style={{ background: "#111" }}>
         <span className="text-white font-semibold text-base">{t.scanner.title}</span>
-        <Button variant="ghost" size="icon" className="text-white hover:text-white hover:bg-white/20" onClick={() => { stopAll(); onOpenChange(false); }}>
+        <Button variant="ghost" size="icon" className="text-white hover:bg-white/20"
+          onClick={() => { stopScanner(); onOpenChange(false); }}>
           <X className="w-5 h-5" />
         </Button>
       </div>
 
-      {/* Video */}
-      <div className="flex-1 relative overflow-hidden bg-black">
-        <video
-          ref={videoRef}
-          className="absolute inset-0 w-full h-full object-cover"
-          playsInline
-          muted
-          autoPlay
-        />
-        <canvas ref={canvasRef} className="hidden" />
+      <div className="flex-1 relative flex flex-col items-center justify-center overflow-hidden" style={{ background: "#000" }}>
 
-        {/* Overlay */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-          {status === "loading" && (
-            <div className="flex flex-col items-center gap-3">
-              <Camera className="w-12 h-12 text-white animate-pulse" />
-              <p className="text-white text-sm bg-black/60 px-4 py-2 rounded-full">جاري تشغيل الكاميرا...</p>
+        <div id={SCANNER_ID} style={{
+          position: "absolute", inset: 0, width: "100%", height: "100%",
+          opacity: status === "scanning" ? 1 : 0, pointerEvents: "none",
+        }} />
+
+        {status === "loading" && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4" style={{ background: "#000" }}>
+            <Camera className="w-16 h-16 text-white animate-pulse" />
+            <p className="text-white text-sm">جاري تشغيل الكاميرا...</p>
+          </div>
+        )}
+
+        {status === "scanning" && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 pointer-events-none">
+            <div className="relative w-64 h-44">
+              <span className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-yellow-400 rounded-tl-lg" />
+              <span className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-yellow-400 rounded-tr-lg" />
+              <span className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-yellow-400 rounded-bl-lg" />
+              <span className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-yellow-400 rounded-br-lg" />
+              <div className="absolute inset-x-2 h-0.5 bg-yellow-400 rounded" style={{ animation: "scanline 2s ease-in-out infinite" }} />
             </div>
-          )}
+            <p className="text-white text-sm bg-black/70 px-4 py-2 rounded-full">{t.scanner.hint}</p>
+          </div>
+        )}
 
-          {status === "scanning" && (
-            <>
-              <div className="w-64 h-48 relative">
-                <span className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-yellow-400 rounded-tl-lg" />
-                <span className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-yellow-400 rounded-tr-lg" />
-                <span className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-yellow-400 rounded-bl-lg" />
-                <span className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-yellow-400 rounded-br-lg" />
-                <div className="absolute inset-x-0 h-0.5 bg-yellow-400/80" style={{ animation: "scanline 2s linear infinite", top: "50%" }} />
-              </div>
-              <p className="text-white text-sm bg-black/60 px-4 py-2 rounded-full">{t.scanner.hint}</p>
-            </>
-          )}
-
-          {status === "error" && (
-            <div className="flex flex-col items-center gap-3 px-6 text-center">
-              <p className="text-white text-sm bg-red-900/80 px-4 py-3 rounded-xl">{errorMsg}</p>
-              <Button variant="outline" className="text-white border-white/40" onClick={() => onOpenChange(false)}>إغلاق</Button>
-            </div>
-          )}
-        </div>
+        {status === "error" && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-8" style={{ background: "#000" }}>
+            <p className="text-white text-sm bg-red-900/90 px-5 py-4 rounded-2xl text-center leading-relaxed whitespace-pre-line">{errorMsg}</p>
+            <Button variant="outline" className="text-white border-white/40 hover:bg-white/10"
+              onClick={() => { stopScanner(); onOpenChange(false); }}>
+              إغلاق
+            </Button>
+          </div>
+        )}
       </div>
 
       <style>{`
-        @keyframes scanline {
-          0%   { transform: translateY(-96px); opacity: 1; }
-          50%  { opacity: 0.6; }
-          100% { transform: translateY(96px); opacity: 1; }
+        @keyframes scanline { 0% { top: 4px; } 50% { top: calc(100% - 4px); } 100% { top: 4px; } }
+        #${SCANNER_ID} > * { display: none !important; }
+        #${SCANNER_ID} video {
+          display: block !important; position: absolute !important;
+          inset: 0 !important; width: 100% !important;
+          height: 100% !important; object-fit: cover !important;
         }
       `}</style>
     </div>
